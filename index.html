@@ -1,43 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>DWG Weather</title>
-
-  <style>
-    body {
-      font-family: Arial;
-      background: #0b1e2d;
-      color: white;
-      text-align: center;
-      padding: 20px;
-    }
-
-    .card {
-      background: #132f45;
-      padding: 15px;
-      margin: 10px;
-      border-radius: 10px;
-    }
-  </style>
-</head>
-
-<body>
-
-<h1>🌦️ DWG Weather App</h1>
-
-<div id="status">Loading app...</div>
-
-<div class="card" id="weatherBox">Weather loading...</div>
-<div class="card" id="tempestBox">Tempest loading...</div>
-
 <script>
-console.log("APP START");
-
-// API KEYS
 const weatherKey = "1964e3c44abd01892f86bed9c6029932";
 const tempestKey = "79cb290e-f774-4463-81bf-c87d9f82fc50";
+const stationID = "75031";
 
-// TEST UI LOAD FIRST
+// ---------------- STATUS ----------------
 document.getElementById("status").innerText = "App loaded. Fetching data...";
 
 // ---------------- WEATHER ----------------
@@ -54,7 +20,7 @@ fetch(`https://api.openweathermap.org/data/2.5/weather?q=Wilmington,DE,US&units=
 
   document.getElementById("weatherBox").innerHTML = `
     <h3>Wilmington</h3>
-    <p>${data.main.temp}°F</p>
+    <p>${data.main.temp.toFixed(1)}°F</p>
     <p>${data.weather[0].description}</p>
   `;
 })
@@ -63,33 +29,57 @@ fetch(`https://api.openweathermap.org/data/2.5/weather?q=Wilmington,DE,US&units=
   document.getElementById("weatherBox").innerText = "Weather error";
 });
 
-// ---------------- TEMPEST ----------------
-fetch(`https://swd.weatherflow.com/swd/rest/observations/station/75031?api_key=${tempestKey}`)
-.then(res => res.json())
-.then(data => {
+// ---------------- TEMPEST (FIXED) ----------------
+function loadTempest(){
 
-  console.log("Tempest data:", data);
+  fetch(`https://swd.weatherflow.com/swd/rest/observations/station/${stationID}?api_key=${tempestKey}`)
+  .then(res => res.json())
+  .then(data => {
 
-  const obs = data.obs?.[0];
+    console.log("Tempest RAW:", data);
 
-  if(!obs){
-    document.getElementById("tempestBox").innerText = "No Tempest data";
-    return;
-  }
+    const obs = data.obs?.[0];
 
-  const tempF = (obs[7] * 9/5) + 32;
+    if(!obs){
+      document.getElementById("tempestBox").innerText = "No Tempest data";
+      return;
+    }
 
-  document.getElementById("tempestBox").innerHTML = `
-    <h3>Tempest Station</h3>
-    <p>${tempF.toFixed(1)}°F</p>
-  `;
-})
-.catch(err => {
-  console.log("Tempest ERROR:", err);
-  document.getElementById("tempestBox").innerText = "Tempest error";
-});
+    // 🔥 SAFE extraction
+    let tempC = obs[7];
+    let windMS = obs[2];
+    let gustMS = obs[3];
+    let pressure = obs[6];
+    let rainMM = obs[12] ?? 0;
+
+    // fallback if structure different
+    if(typeof tempC !== "number"){
+      tempC = obs.find(v => typeof v === "number" && v > -50 && v < 60);
+    }
+
+    // conversions
+    const tempF = (typeof tempC === "number") ? (tempC * 9/5) + 32 : null;
+    const windMPH = (typeof windMS === "number") ? windMS * 2.237 : null;
+    const gustMPH = (typeof gustMS === "number") ? gustMS * 2.237 : null;
+    const rainIN = rainMM * 0.03937;
+
+    document.getElementById("tempestBox").innerHTML = `
+      <h3>Tempest Station</h3>
+      <p>🌡️ ${tempF ? tempF.toFixed(1) + "°F" : "--"}</p>
+      <p>💨 Wind: ${windMPH ? windMPH.toFixed(1) + " mph" : "--"}</p>
+      <p>🌬️ Gust: ${gustMPH ? gustMPH.toFixed(1) + " mph" : "--"}</p>
+      <p>🌧️ Rain: ${rainIN.toFixed(2)} in</p>
+      <p>📊 Pressure: ${pressure ? pressure + " mb" : "--"}</p>
+    `;
+
+  })
+  .catch(err => {
+    console.log("Tempest ERROR:", err);
+    document.getElementById("tempestBox").innerText = "Tempest error";
+  });
+}
+
+// RUN TEMPEST
+loadTempest();
 
 </script>
-
-</body>
-</html>
