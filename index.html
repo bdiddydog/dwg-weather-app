@@ -1,215 +1,95 @@
-﻿<script>
-const apiKey = "1964e3c44abd01892f86bed9c6029932";
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DWG Weather</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0b1e2d;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #132f45;
+      padding: 15px;
+      margin: 10px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🌦️ DWG Weather App</h1>
+
+<div id="status">Loading app...</div>
+
+<div class="card" id="weatherBox">Weather loading...</div>
+<div class="card" id="tempestBox">Tempest loading...</div>
+
+<script>
+console.log("APP START");
+
+// API KEYS
+const weatherKey = "1964e3c44abd01892f86bed9c6029932";
 const tempestKey = "79cb290e-f774-4463-81bf-c87d9f82fc50";
-const stationID = "75031";
 
+// TEST UI LOAD FIRST
+document.getElementById("status").innerText = "App loaded. Fetching data...";
 
-const locations = [
-  {name:"Wilmington", lat:39.7391, lon:-75.5398},
-  {name:"Dover", lat:39.1582, lon:-75.5244},
-  {name:"Georgetown", lat:38.6901, lon:-75.3855}
-];
+// ---------------- WEATHER ----------------
+fetch(`https://api.openweathermap.org/data/2.5/weather?q=Wilmington,DE,US&units=imperial&appid=${weatherKey}`)
+.then(res => res.json())
+.then(data => {
 
+  console.log("Weather data:", data);
 
-function loadWeather(){
-  const container = document.getElementById("weatherContainer");
-  container.innerHTML = "Loading weather...";
-
-
-  locations.forEach(loc => {
-    fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${loc.lat}&lon=${loc.lon}&units=imperial&appid=${apiKey}`)
-      .then(res => res.json())
-      .then(data => {
-
-
-        if(!data.weather) return;
-
-
-        const icon = data.weather[0].icon;
-
-
-        const card = document.createElement("div");
-        card.className = "flip-card";
-
-
-        card.innerHTML = `
-          <div class="flip-inner">
-            <div class="flip-front">
-              <h3>${loc.name}</h3>
-              <img src="https://openweathermap.org/img/wn/${icon}@2x.png">
-              <p>${Math.round(data.main.temp)}°F</p>
-              <p>${data.weather[0].description}</p>
-            </div>
-
-
-            <div class="flip-back">
-              <p>Wind: ${data.wind.speed} mph</p>
-              <p>Humidity: ${data.main.humidity}%</p>
-              <p>Pressure: ${data.main.pressure} mb</p>
-            </div>
-          </div>
-        `;
-
-
-        container.appendChild(card);
-
-
-        if(loc.name === "Wilmington"){
-          generateDWG(data);
-        }
-
-
-      })
-      .catch(err => console.log("Weather ERROR:", err));
-  });
-}
-
-
-function generateDWG(data){
-  try {
-    const temp = data.main.temp;
-    const humidity = data.main.humidity;
-    const wind = data.wind.speed;
-
-
-    let instability = temp > 75 ? "High" : temp > 60 ? "Moderate" : "Low";
-    let lift = wind > 15 ? "Strong" : "Weak";
-
-
-    let score = 0;
-    if(temp > 70) score += 3;
-    if(humidity > 60) score += 3;
-    if(wind > 15) score += 2;
-
-
-    document.getElementById("cape").innerText = instability;
-    document.getElementById("humidity").innerText = humidity + "%";
-    document.getElementById("lift").innerText = lift;
-    document.getElementById("stormScore").innerText = score;
-
-
-    document.getElementById("timeline").innerText =
-      score >= 6
-      ? "Storms Possible Later"
-      : "Quiet Pattern";
-
-
-  } catch(e){
-    console.log("DWG ERROR:", e);
+  if(!data.main){
+    document.getElementById("weatherBox").innerText = "Weather failed to load";
+    return;
   }
-}
 
+  document.getElementById("weatherBox").innerHTML = `
+    <h3>Wilmington</h3>
+    <p>${data.main.temp}°F</p>
+    <p>${data.weather[0].description}</p>
+  `;
+})
+.catch(err => {
+  console.log("Weather ERROR:", err);
+  document.getElementById("weatherBox").innerText = "Weather error";
+});
 
-function loadHourly(){
-  fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=39.7391&lon=-75.5398&units=imperial&appid=${apiKey}`)
-    .then(res => res.json())
-    .then(data => {
+// ---------------- TEMPEST ----------------
+fetch(`https://swd.weatherflow.com/swd/rest/observations/station/75031?api_key=${tempestKey}`)
+.then(res => res.json())
+.then(data => {
 
+  console.log("Tempest data:", data);
 
-      if(!data.list) return;
+  const obs = data.obs?.[0];
 
+  if(!obs){
+    document.getElementById("tempestBox").innerText = "No Tempest data";
+    return;
+  }
 
-      const hourly = document.getElementById("hourly");
-      hourly.innerHTML = "";
+  const tempF = (obs[7] * 9/5) + 32;
 
+  document.getElementById("tempestBox").innerHTML = `
+    <h3>Tempest Station</h3>
+    <p>${tempF.toFixed(1)}°F</p>
+  `;
+})
+.catch(err => {
+  console.log("Tempest ERROR:", err);
+  document.getElementById("tempestBox").innerText = "Tempest error";
+});
 
-      data.list.slice(0,6).forEach(hour => {
-        const icon = hour.weather[0].icon;
-
-
-        const div = document.createElement("div");
-
-
-        div.innerHTML = `
-          <p>${hour.dt_txt.split(" ")[1].slice(0,5)}</p>
-          <img src="https://openweathermap.org/img/wn/${icon}.png">
-          <p>${Math.round(hour.main.temp)}°</p>
-        `;
-
-
-        hourly.appendChild(div);
-      });
-
-
-    })
-    .catch(err => console.log("Hourly ERROR:", err));
-}
-
-
-function loadTempest(){
-  fetch(`https://swd.weatherflow.com/swd/rest/observations/station/${stationID}?api_key=${tempestKey}`)
-    .then(res => res.json())
-    .then(data => {
-
-
-      console.log("Tempest RAW:", data);
-
-
-      const obs = data.obs?.[0];
-      if(!obs) return;
-
-
-      const tempC = obs[7];
-      const windMS = obs[2];
-      const gustMS = obs[3];
-      const pressure = obs[6];
-      const rainMM = obs[12] || 0;
-
-
-      const tempF = (tempC * 9/5) + 32;
-      const windMPH = windMS * 2.237;
-      const gustMPH = gustMS * 2.237;
-      const rainIN = rainMM * 0.03937;
-
-
-      document.getElementById("tempestTemp").innerText = tempF.toFixed(1) + "°F";
-      document.getElementById("tempestWind").innerText = windMPH.toFixed(1) + " mph";
-      document.getElementById("tempestGust").innerText = gustMPH.toFixed(1) + " mph";
-      document.getElementById("tempestRain").innerText = rainIN.toFixed(2) + " in";
-      document.getElementById("tempestPressure").innerText = pressure + " mb";
-
-
-    })
-    .catch(err => console.log("Tempest ERROR:", err));
-}
-
-
-function loadAlerts(){
-  fetch("https://api.weather.gov/alerts/active?area=DE")
-    .then(res => res.json())
-    .then(data => {
-
-
-      const banner = document.getElementById("alertBanner");
-
-
-      if(!data.features || data.features.length === 0){
-        banner.innerHTML = "No Active Alerts";
-        banner.style.background = "green";
-      } else {
-        banner.innerHTML = "ACTIVE ALERTS";
-      }
-
-
-    })
-    .catch(err => console.log("Alerts ERROR:", err));
-}
-
-
-function showSection(section){
-  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-  document.getElementById(section).classList.add("active");
-}
-
-
-// INIT
-window.onload = () => {
-  console.log("App Loaded");
-
-
-  loadWeather();
-  loadHourly();
-  loadAlerts();
-  loadTempest();
-};
 </script>
+
+</body>
+</html>
